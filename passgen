@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+
+set -e
+
+BOLD=$(printf '\033[1m')
+CYAN=$(printf '\033[1;36m')
+RESET=$(printf '\033[0m')
+
+length=8
+use_symbols=false
+copy=false
+
+LOWER="abcdefghijklmnopqrstuvwxyz"
+UPPER="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+NUMBERS="0123456789"
+SYMBOLS='!@#$%^&*()-_=+[]{};:,.?'
+
+
+show_help() {
+    cat <<EOF
+${CYAN}
+╔══════════════════════════════════════════════╗
+║            Password Generator 🔐             ║
+╚══════════════════════════════════════════════╝${RESET}
+
+${BOLD}USAGE${RESET}
+  passgen [OPTIONS]
+
+${BOLD}OPTIONS${RESET}
+  ${BOLD}-x <length>${RESET}    Set password length (default: 8)
+  ${BOLD}-A${RESET}             Include symbols (!@#\$%^&*...)
+  ${BOLD}-c${RESET}             Copy password to clipboard
+  ${BOLD}-h, --help${RESET}     Show this help message
+
+${BOLD}EXAMPLES${RESET}
+  passgen
+  passgen -x 16
+  passgen -x 24 -A
+  passgen -x 20 -A -c
+
+EOF
+}
+
+random_char() {
+    printf "%s" "$1" | fold -w1 | shuf | head -n1
+}
+
+if [[ "$@" == "--help" ]]; then
+    show_help
+    exit 0
+fi
+
+while getopts ":x:Ach" opt; do
+  case "$opt" in
+    x) length="$OPTARG" ;;
+    A) use_symbols=true ;;
+    c) copy=true ;;
+    h) show_help
+       exit 0
+       ;;
+    \?) echo "Unknown option: -$OPTARG"
+        exit 1
+        ;;
+    :)  echo "Option -$OPTARG requires an argument."
+        exit 1
+        ;;
+  esac
+done
+
+if $use_symbols; then
+    CHARSET="${LOWER}${UPPER}${NUMBERS}${SYMBOLS}"
+else
+    CHARSET="${LOWER}${UPPER}${NUMBERS}"
+fi
+
+password=""
+
+password+=$(random_char "$LOWER")
+password+=$(random_char "$UPPER")
+password+=$(random_char "$NUMBERS")
+
+if $use_symbols; then
+    password+=$(random_char "$SYMBOLS")
+fi
+
+while [ "${#password}" -lt "$length" ]; do
+    password+=$(random_char "$CHARSET")
+done
+
+password=$(printf "%s" "$password" | fold -w1 | shuf | tr -d '\n')
+
+printf "\n${BOLD}Generated password:${RESET}\n"
+printf "%s\n\n" "$password"
+
+if $copy; then
+
+    if command -v xclip >/dev/null 2>&1; then
+        printf "%s" "$password" | xclip -selection clipboard
+        echo "Copied to clipboard!"
+
+    elif command -v wl-copy >/dev/null 2>&1; then
+        printf "%s" "$password" | wl-copy
+        echo "Copied to clipboard!"
+
+    elif command -v pbcopy >/dev/null 2>&1; then
+        printf "%s" "$password" | pbcopy
+        echo "Copied to clipboard!"
+
+    else
+        echo "Clipboard tool not found."
+        echo "Install xclip, wl-copy, or use pbcopy on macOS."
+        exit 1
+    fi
+
+fi
